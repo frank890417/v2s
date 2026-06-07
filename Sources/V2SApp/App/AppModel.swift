@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     private let glossaryService = GlossaryService()
     private let entityCache = EntityCache()
     private let speedMonitor = SpeedMonitor()
+    private let transcriptLogger = TranscriptLogger()
     private var liveTranscriptionSession: LiveTranscriptionSession?
     private var liveTranscriptionSessions: [LiveTranscriptionSession] = []
     private var captionDisplayTask: Task<Void, Never>?
@@ -538,9 +539,11 @@ final class AppModel: ObservableObject {
         let previousTranscriptOutputLanguageID = transcriptOutputLanguageID
         let selectedInputLanguageIDs = Set(selectedSources.map { languageID(for: $0) })
         let selectedOutputLanguageIDs = Set(selectedSources.map { outputLanguageIDForSource($0) })
+        let transcriptSourceLanguageID = selectedInputLanguageIDs.count == 1 ? selectedInputLanguageIDs.first! : inputLanguageID
+        let transcriptTargetLanguageID = selectedOutputLanguageIDs.count == 1 ? selectedOutputLanguageIDs.first! : outputLanguageID
         resetTranscript(
-            sourceLanguageID: selectedInputLanguageIDs.count == 1 ? selectedInputLanguageIDs.first! : inputLanguageID,
-            targetLanguageID: selectedOutputLanguageIDs.count == 1 ? selectedOutputLanguageIDs.first! : outputLanguageID
+            sourceLanguageID: transcriptSourceLanguageID,
+            targetLanguageID: transcriptTargetLanguageID
         )
 
         isOverlayVisible = true
@@ -601,6 +604,10 @@ final class AppModel: ObservableObject {
 
             sessionState = .running
             setStatus(.running(sourceName: selectedSourceName))
+            transcriptLogger.startSession(
+                sourceLanguageID: transcriptSourceLanguageID,
+                targetLanguageID: transcriptTargetLanguageID
+            )
         } catch {
             for session in startedSessions {
                 session.stop()
@@ -644,6 +651,7 @@ final class AppModel: ObservableObject {
         }
         liveTranscriptionSessions.removeAll()
         liveTranscriptionSession = nil
+        transcriptLogger.finishSession()
     }
 
     func showOverlayPreview() {
@@ -2645,6 +2653,8 @@ final class AppModel: ObservableObject {
         } else {
             transcriptEntries.append(entry)
         }
+
+        transcriptLogger.record(entries: transcriptEntries)
     }
 
     private func levenshteinDistanceRatio(_ a: String, _ b: String) -> Double {
