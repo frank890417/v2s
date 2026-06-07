@@ -110,7 +110,6 @@ struct StatusBarPopoverView: View {
                     options: LanguageCatalog.speechInput,
                     selection: model.inputLanguageSelectionBinding
                 )
-                .disabled(model.isLanguagePairLocked)
             }
             SettingsControlRow(label: model.localized(.defaultSubtitleLanguage)) {
                 CommonLanguageMenuPicker(

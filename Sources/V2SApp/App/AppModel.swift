@@ -92,6 +92,12 @@ final class AppModel: ObservableObject {
             persistSettings()
             syncOverlayPreviewIfNeeded()
             scheduleSelectedLanguageResourcePreparation(openSystemSettingsIfNeeded: true)
+            // When the input language changes mid-session, restart the live ASR
+            // engine(s) with the new locale while preserving the transcript,
+            // overlay history, and the on-disk transcript log.
+            if sessionState == .running, isBootstrapping == false {
+                Task { @MainActor [weak self] in await self?.switchInputLanguageLive() }
+            }
         }
     }
 
@@ -578,44 +584,11 @@ final class AppModel: ObservableObject {
         var startedSessions: [LiveTranscriptionSession] = []
 
         do {
-            for source in selectedSources {
-                let sourceLanguageID = languageID(for: source)
-                let targetLanguageID = outputLanguageIDForSource(source)
-                let session = LiveTranscriptionSession()
-                try await session.start(
-                    source: source,
-                    localeIdentifier: LanguageCatalog.speechLocaleIdentifier(for: sourceLanguageID),
-                    interfaceLanguageID: resolvedInterfaceLanguageID,
-                    modeConfig: config,
-                    contextualStrings: recognitionHints,
-                    transcriptHandler: { [weak self] sentence in
-                        self?.enqueueRecognizedSentence(
-                            sentence,
-                            source: source,
-                            sourceLanguageID: sourceLanguageID,
-                            targetLanguageID: targetLanguageID
-                        )
-                    },
-                    partialHandler: { [weak self] draft in
-                        self?.handlePartialDraft(
-                            draft,
-                            source: source,
-                            sourceLanguageID: sourceLanguageID,
-                            targetLanguageID: targetLanguageID
-                        )
-                    },
-                    errorHandler: { [weak self] message in
-                        self?.sessionState = .error
-                        self?.setStatus(.custom(message))
-                        self?.overlayState = OverlayPreviewState(
-                            translatedText: self?.captureStoppedText ?? "",
-                            sourceText: message,
-                            sourceName: source.name
-                        )
-                    }
-                )
-                startedSessions.append(session)
-            }
+            startedSessions = try await startTranscriptionEngines(
+                selectedSources: selectedSources,
+                config: config,
+                recognitionHints: recognitionHints
+            )
 
             liveTranscriptionSessions = startedSessions
             liveTranscriptionSession = startedSessions.first
@@ -670,6 +643,119 @@ final class AppModel: ObservableObject {
         liveTranscriptionSessions.removeAll()
         liveTranscriptionSession = nil
         transcriptLogger.finishSession()
+    }
+
+    /// Builds and starts one live transcription engine per selected source, wiring
+    /// the transcript/partial/error handlers, and returns the started sessions.
+    /// Shared by `startSession()` and `switchInputLanguageLive()` so the handler
+    /// wiring stays identical between cold start and a live input-language switch.
+    @MainActor
+    private func startTranscriptionEngines(
+        selectedSources: [InputSource],
+        config: ModeConfig,
+        recognitionHints: [String]
+    ) async throws -> [LiveTranscriptionSession] {
+        var startedSessions: [LiveTranscriptionSession] = []
+        // If any engine fails to start, stop the ones already started before
+        // rethrowing so callers never leak partially-started sessions.
+        do {
+        for source in selectedSources {
+            let sourceLanguageID = languageID(for: source)
+            let targetLanguageID = outputLanguageIDForSource(source)
+            let session = LiveTranscriptionSession()
+            try await session.start(
+                source: source,
+                localeIdentifier: LanguageCatalog.speechLocaleIdentifier(for: sourceLanguageID),
+                interfaceLanguageID: resolvedInterfaceLanguageID,
+                modeConfig: config,
+                contextualStrings: recognitionHints,
+                transcriptHandler: { [weak self] sentence in
+                    self?.enqueueRecognizedSentence(
+                        sentence,
+                        source: source,
+                        sourceLanguageID: sourceLanguageID,
+                        targetLanguageID: targetLanguageID
+                    )
+                },
+                partialHandler: { [weak self] draft in
+                    self?.handlePartialDraft(
+                        draft,
+                        source: source,
+                        sourceLanguageID: sourceLanguageID,
+                        targetLanguageID: targetLanguageID
+                    )
+                },
+                errorHandler: { [weak self] message in
+                    self?.sessionState = .error
+                    self?.setStatus(.custom(message))
+                    self?.overlayState = OverlayPreviewState(
+                        translatedText: self?.captureStoppedText ?? "",
+                        sourceText: message,
+                        sourceName: source.name
+                    )
+                }
+            )
+            startedSessions.append(session)
+        }
+        } catch {
+            for session in startedSessions {
+                session.stop()
+            }
+            throw error
+        }
+        return startedSessions
+    }
+
+    /// Restarts the live ASR engine(s) with the currently-selected input language
+    /// while a session is running, so the user can follow a speaker who switches
+    /// to their native language mid-meeting.
+    ///
+    /// Correctness: this PRESERVES the accumulated `transcriptEntries`, the overlay
+    /// scrollback (`overlayState.history`), and the running `TranscriptLogger`
+    /// session (the on-disk transcript keeps appending to the SAME folder). Only
+    /// the recognition engines are torn down and recreated with the new locale.
+    @MainActor
+    private func switchInputLanguageLive() async {
+        guard sessionState == .running else { return }
+
+        // Stop only the ASR engines. Do NOT call stopLiveTranscriptionSessions(),
+        // which would finish the on-disk transcript logger session.
+        for session in liveTranscriptionSessions {
+            session.stop()
+        }
+        liveTranscriptionSession?.stop()
+        liveTranscriptionSessions.removeAll()
+        liveTranscriptionSession = nil
+
+        // Cancel in-flight drafts/captions/translations. This preserves
+        // transcriptEntries and overlayState.history.
+        resetLiveTextPipeline()
+
+        let selectedSources = self.selectedSources
+        let config = ModeConfig.config(for: subtitleMode)
+        let recognitionHints = recognitionContextualStrings()
+
+        do {
+            let startedSessions = try await startTranscriptionEngines(
+                selectedSources: selectedSources,
+                config: config,
+                recognitionHints: recognitionHints
+            )
+            liveTranscriptionSessions = startedSessions
+            liveTranscriptionSession = startedSessions.first
+            // Session stays running; status already reflects the running source.
+        } catch {
+            for session in liveTranscriptionSessions {
+                session.stop()
+            }
+            liveTranscriptionSession?.stop()
+            liveTranscriptionSessions.removeAll()
+            liveTranscriptionSession = nil
+            // Mirror startSession()'s catch, but do NOT reset the transcript: the
+            // accumulated entries and the on-disk log must survive a failed switch.
+            sessionState = .error
+            setStatus(.custom(localizedErrorDescription(error)))
+        }
     }
 
     func showOverlayPreview() {

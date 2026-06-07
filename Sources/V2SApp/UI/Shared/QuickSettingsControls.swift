@@ -390,7 +390,10 @@ extension AppModel {
         Binding(
             get: { self.inputLanguageID },
             set: {
-                guard self.isLanguagePairLocked == false else { return }
+                // Input language can change even while a session is running so the
+                // user can switch to a speaker's native language mid-meeting. The
+                // running ASR engines are restarted via `inputLanguageID.didSet`
+                // while the transcript / overlay history / on-disk log are kept.
                 self.inputLanguageID = LanguageCatalog.supportedSpeechInputLanguageID(for: $0)
             }
         )

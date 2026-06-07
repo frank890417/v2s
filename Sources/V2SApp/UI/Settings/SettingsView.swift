@@ -137,7 +137,6 @@ struct SettingsView: View {
                             options: LanguageCatalog.speechInput,
                             selection: model.inputLanguageSelectionBinding
                         )
-                        .disabled(model.isLanguagePairLocked)
                     }
                     Divider()
                     SettingsControlRow(label: model.localized(.defaultSubtitleLanguage)) {
