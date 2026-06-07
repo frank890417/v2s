@@ -118,6 +118,14 @@ struct StatusBarPopoverView: View {
                 )
                 .disabled(model.isLanguagePairLocked)
             }
+            SettingsControlRow(label: "Second subtitle language") {
+                DefaultableLanguageMenuPicker(
+                    interfaceLanguageID: model.resolvedInterfaceLanguageID,
+                    defaultTitle: "None",
+                    selection: model.secondOutputLanguageSelectionBinding
+                )
+                .disabled(model.isLanguagePairLocked)
+            }
             SettingsControlRow(label: model.localized(.modeShort)) {
                 SubtitleModeMenuPicker(
                     interfaceLanguageID: model.resolvedInterfaceLanguageID,
