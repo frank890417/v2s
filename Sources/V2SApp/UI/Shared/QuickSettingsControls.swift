@@ -406,6 +406,18 @@ extension AppModel {
         )
     }
 
+    /// Binding for the optional second subtitle language. `nil` represents the
+    /// "None" choice, which maps to an empty `secondOutputLanguageID` (off).
+    var secondOutputLanguageSelectionBinding: Binding<String?> {
+        Binding(
+            get: { self.secondOutputLanguageID.isEmpty ? nil : self.secondOutputLanguageID },
+            set: {
+                guard self.isLanguagePairLocked == false else { return }
+                self.secondOutputLanguageID = $0 ?? ""
+            }
+        )
+    }
+
     var subtitleModeSelectionBinding: Binding<SubtitleMode> {
         Binding(
             get: { self.subtitleMode },

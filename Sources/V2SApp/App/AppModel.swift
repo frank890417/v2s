@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     private let settingsStore: SettingsStore
     private let sourceCatalogService: SourceCatalogService
     private let translationCoordinator = TranslationCoordinator()
+    private let translationCoordinator2 = TranslationCoordinator()
     private let glossaryService = GlossaryService()
     private let entityCache = EntityCache()
     private let speedMonitor = SpeedMonitor()
@@ -32,6 +33,7 @@ final class AppModel: ObservableObject {
     private var isBootstrapping = true
     private var usesSystemInterfaceLanguage = true
     private var draftTranslationTask: Task<Void, Never>?
+    private var secondTranslationTask: Task<Void, Never>?
     private var draftClearTask: Task<Void, Never>?
     private var committedCaptionArchiveTask: Task<Void, Never>?
     private var languageResourcePreparationTask: Task<Void, Never>?
@@ -60,6 +62,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var overlayState: OverlayPreviewState?
     @Published private(set) var languageResourceStatuses: [LanguageResourceStatus] = []
     @Published private(set) var translationHostConfiguration: TranslationSession.Configuration?
+    @Published private(set) var translationHostConfiguration2: TranslationSession.Configuration?
     @Published private(set) var transcriptEntries: [TranscriptEntry] = []
     @Published private(set) var transcriptGeneration: Int = 0
     @Published var isOverlayVisible = false
@@ -123,6 +126,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Optional second subtitle output language. Empty string means "off" and the
+    /// behavior is identical to a single-target translation pipeline.
+    @Published var secondOutputLanguageID: String {
+        didSet {
+            guard oldValue != secondOutputLanguageID else { return }
+            persistSettings()
+            handleSecondOutputLanguageChange()
+        }
+    }
+
     @Published var interfaceLanguageID: String {
         didSet {
             guard oldValue != interfaceLanguageID else { return }
@@ -179,6 +192,7 @@ final class AppModel: ObservableObject {
         self.sourceOutputLanguageOverrides = settings.sourceOutputLanguageOverrides
         self.inputLanguageID = LanguageCatalog.supportedSpeechInputLanguageID(for: settings.inputLanguageID)
         self.outputLanguageID = settings.outputLanguageID
+        self.secondOutputLanguageID = settings.secondOutputLanguageID
         self.usesSystemInterfaceLanguage = settings.interfaceLanguageID == nil
         self.interfaceLanguageID = LanguageCatalog.preferredInterfaceLanguageID(
             storedIdentifier: settings.interfaceLanguageID
@@ -189,10 +203,14 @@ final class AppModel: ObservableObject {
         self.subtitleDisplayMode = settings.subtitleDisplayMode
         self.glossary = settings.glossary
         self.translationHostConfiguration = nil
+        self.translationHostConfiguration2 = nil
         AppLocalization.updateEmbeddedBundleLocalizationLanguageID(self.interfaceLanguageID)
 
         translationCoordinator.onConfigurationChange = { [weak self] configuration in
             self?.translationHostConfiguration = configuration
+        }
+        translationCoordinator2.onConfigurationChange = { [weak self] configuration in
+            self?.translationHostConfiguration2 = configuration
         }
 
         isBootstrapping = false
@@ -712,6 +730,7 @@ final class AppModel: ObservableObject {
             sourceOutputLanguageOverrides: sourceOutputLanguageOverrides,
             inputLanguageID: inputLanguageID,
             outputLanguageID: outputLanguageID,
+            secondOutputLanguageID: secondOutputLanguageID,
             interfaceLanguageID: usesSystemInterfaceLanguage ? nil : interfaceLanguageID,
             overlayStyle: overlayStyle,
             subtitleMode: subtitleMode,
@@ -797,6 +816,11 @@ final class AppModel: ObservableObject {
     @available(macOS 15.0, *)
     func runTranslationHost(using session: TranslationSession) async {
         await translationCoordinator.run(using: session)
+    }
+
+    @available(macOS 15.0, *)
+    func runTranslationHost2(using session: TranslationSession) async {
+        await translationCoordinator2.run(using: session)
     }
 
     func refreshLanguageResources() {
@@ -1607,6 +1631,74 @@ final class AppModel: ObservableObject {
         }
         displayedCaptionLastVisualUpdateAt = Date()
         displayedCaptionLastVisualUpdateWasLateTranslation = lateTranslation
+
+        updateSecondTranslation(sourceText: sourceText, captionID: displayedCaption?.id)
+    }
+
+    /// Computes the second-language translation for the committed caption and
+    /// writes it into `overlayState?.secondTranslatedText`. When the second
+    /// output language is unset (or matches the source), this is a no-op that
+    /// keeps the second line empty, so single-target behavior is unchanged.
+    private func updateSecondTranslation(sourceText: String, captionID: UUID?) {
+        secondTranslationTask?.cancel()
+        secondTranslationTask = nil
+
+        let target = secondOutputLanguageID
+        let source = displayedCaption?.sourceLanguageID
+
+        guard target.isEmpty == false,
+              sourceText.isEmpty == false,
+              let source,
+              source != target else {
+            overlayState?.secondTranslatedText = ""
+            return
+        }
+
+        // Clear any stale second-language text while the new translation computes.
+        overlayState?.secondTranslatedText = ""
+
+        secondTranslationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            let raw = try? await self.translationCoordinator2.translate(
+                sourceText,
+                from: source,
+                to: target
+            )
+
+            guard Task.isCancelled == false,
+                  self.displayedCaption?.id == captionID,
+                  let raw else {
+                return
+            }
+
+            let currentGlossary = self.glossary
+            let finalText = self.sanitizedDisplayText(
+                self.glossaryService.apply(to: raw, glossary: currentGlossary)
+            )
+
+            guard finalText.isEmpty == false else {
+                return
+            }
+
+            self.overlayState?.secondTranslatedText = finalText
+            self.secondTranslationTask = nil
+        }
+    }
+
+    /// Re-runs (or clears) the second translation when the user switches the
+    /// second output language while a caption is on screen.
+    private func handleSecondOutputLanguageChange() {
+        scheduleSelectedLanguageResourcePreparation(
+            refreshTranslations: liveTranscriptionSession != nil,
+            openSystemSettingsIfNeeded: true
+        )
+
+        guard let overlayState else { return }
+        updateSecondTranslation(
+            sourceText: overlayState.sourceText,
+            captionID: displayedCaption?.id
+        )
     }
 
     // MARK: - Settings sync
@@ -1876,6 +1968,8 @@ final class AppModel: ObservableObject {
         draftClearTask = nil
         draftTranslationTask?.cancel()
         draftTranslationTask = nil
+        secondTranslationTask?.cancel()
+        secondTranslationTask = nil
         committedCaptionArchiveTask?.cancel()
         committedCaptionArchiveTask = nil
         activeDraftSourceLanguageID = nil
@@ -1901,6 +1995,8 @@ final class AppModel: ObservableObject {
 
         translationCoordinator.invalidateSession()
         translationCoordinator.reset()
+        translationCoordinator2.invalidateSession()
+        translationCoordinator2.reset()
 
         Task {
             await entityCache.reset()
@@ -3566,6 +3662,9 @@ extension View {
         if #available(macOS 15.0, *) {
             self.translationTask(model.translationHostConfiguration) { session in
                 await model.runTranslationHost(using: session)
+            }
+            .translationTask(model.translationHostConfiguration2) { session in
+                await model.runTranslationHost2(using: session)
             }
         } else {
             self

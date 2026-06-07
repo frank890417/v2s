@@ -7,6 +7,7 @@ struct AppSettings: Codable {
     var sourceOutputLanguageOverrides: [String: String]
     var inputLanguageID: String
     var outputLanguageID: String
+    var secondOutputLanguageID: String
     var interfaceLanguageID: String?
     var overlayStyle: OverlayStyle
     var subtitleMode: SubtitleMode
@@ -20,6 +21,7 @@ struct AppSettings: Codable {
         sourceOutputLanguageOverrides: [:],
         inputLanguageID: "en",
         outputLanguageID: "zh-Hans",
+        secondOutputLanguageID: "",
         interfaceLanguageID: nil,
         overlayStyle: .default,
         subtitleMode: .balanced,
@@ -42,6 +44,8 @@ struct AppSettings: Codable {
             ?? AppSettings.default.inputLanguageID
         outputLanguageID = (try? c.decodeIfPresent(String.self, forKey: .outputLanguageID))
             ?? AppSettings.default.outputLanguageID
+        secondOutputLanguageID = (try? c.decodeIfPresent(String.self, forKey: .secondOutputLanguageID))
+            ?? ""
         interfaceLanguageID = try? c.decodeIfPresent(String.self, forKey: .interfaceLanguageID)
         overlayStyle = (try? c.decodeIfPresent(OverlayStyle.self, forKey: .overlayStyle))
             ?? AppSettings.default.overlayStyle
@@ -60,6 +64,7 @@ struct AppSettings: Codable {
         sourceOutputLanguageOverrides: [String: String] = [:],
         inputLanguageID: String,
         outputLanguageID: String,
+        secondOutputLanguageID: String = "",
         interfaceLanguageID: String?,
         overlayStyle: OverlayStyle,
         subtitleMode: SubtitleMode,
@@ -72,6 +77,7 @@ struct AppSettings: Codable {
         self.sourceOutputLanguageOverrides = sourceOutputLanguageOverrides
         self.inputLanguageID  = inputLanguageID
         self.outputLanguageID = outputLanguageID
+        self.secondOutputLanguageID = secondOutputLanguageID
         self.interfaceLanguageID = interfaceLanguageID
         self.overlayStyle     = overlayStyle
         self.subtitleMode     = subtitleMode

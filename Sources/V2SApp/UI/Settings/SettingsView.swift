@@ -148,6 +148,15 @@ struct SettingsView: View {
                         .disabled(model.isLanguagePairLocked)
                     }
                     Divider()
+                    SettingsControlRow(label: "Second subtitle language") {
+                        DefaultableLanguageMenuPicker(
+                            interfaceLanguageID: model.resolvedInterfaceLanguageID,
+                            defaultTitle: "None",
+                            selection: model.secondOutputLanguageSelectionBinding
+                        )
+                        .disabled(model.isLanguagePairLocked)
+                    }
+                    Divider()
                     SettingsControlRow(label: model.localized(.subtitleMode)) {
                         HStack(spacing: 4) {
                             SubtitleModeMenuPicker(

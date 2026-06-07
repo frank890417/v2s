@@ -145,19 +145,55 @@ struct OverlayView: View {
 
     private func committedLayer(_ state: OverlayPreviewState) -> some View {
         applyingPromotionTransition(
-            to: captionPair(
-                translated: state.translatedText,
-                translatedColor: baseSubtitleColor,
-                source: state.sourceText,
-                sourceColor: subtitleColor(opacity: 0.82)
-            )
-            .background(committedSlotHeightReader),
+            to: committedCaptionBody(state)
+                .background(committedSlotHeightReader),
             key: promotionKey(
                 promotionID: state.committedPromotionID,
                 sourceText: state.sourceText,
                 translatedText: state.translatedText
             )
         )
+    }
+
+    @ViewBuilder
+    private func committedCaptionBody(_ state: OverlayPreviewState) -> some View {
+        if state.secondTranslatedText.isEmpty == false {
+            committedTripleLine(state)
+        } else {
+            captionPair(
+                translated: state.translatedText,
+                translatedColor: baseSubtitleColor,
+                source: state.sourceText,
+                sourceColor: subtitleColor(opacity: 0.82)
+            )
+        }
+    }
+
+    /// Three-line committed caption: source on top, primary translation, then the
+    /// second-language translation. Used only when a second output language is set.
+    private func committedTripleLine(_ state: OverlayPreviewState) -> some View {
+        VStack(spacing: Self.captionPairSpacing) {
+            if showsOriginalSubtitle, state.sourceText.isEmpty == false {
+                sourceText(
+                    state.sourceText,
+                    color: subtitleColor(opacity: 0.82)
+                )
+            }
+
+            if showsTranslatedSubtitle, state.translatedText.isEmpty == false {
+                translatedText(
+                    state.translatedText,
+                    color: baseSubtitleColor
+                )
+            }
+
+            if showsTranslatedSubtitle {
+                translatedText(
+                    state.secondTranslatedText,
+                    color: subtitleColor(opacity: 0.82)
+                )
+            }
+        }
     }
 
     private func translatedText(_ text: String, color: Color) -> some View {

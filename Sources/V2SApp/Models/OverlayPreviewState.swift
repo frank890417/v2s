@@ -17,6 +17,9 @@ struct OverlayPreviewState: Equatable {
     var translatedText: String
     var sourceText: String
     var sourceName: String
+    /// Optional second-language translation of the committed caption.
+    /// Empty when the second output language is unset (no third caption line).
+    var secondTranslatedText: String = ""
 
     // MARK: Draft layer — partial ASR, shown below committed
     var draftSourceText: String? = nil
