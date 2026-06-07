@@ -2884,6 +2884,8 @@ final class AppModel: ObservableObject {
         switch languageID {
         case "zh-Hans":
             return "欢迎使用 v2s，顶部字幕条已经准备好了。"
+        case "zh-Hant":
+            return "歡迎使用 v2s，頂部字幕條已經準備好了。"
         case "es":
             return "Bienvenido a v2s. La barra de subtitulos ya esta lista."
         case "de":

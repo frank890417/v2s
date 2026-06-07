@@ -13,6 +13,7 @@ enum LanguageCatalog {
     static let common: [LanguageOption] = [
         LanguageOption(id: "en", displayName: "English"),
         LanguageOption(id: "zh-Hans", displayName: "Chinese (Simplified)"),
+        LanguageOption(id: "zh-Hant", displayName: "Chinese (Traditional)"),
         LanguageOption(id: "es", displayName: "Spanish"),
         LanguageOption(id: "de", displayName: "German"),
         LanguageOption(id: "ja", displayName: "Japanese"),
@@ -26,6 +27,7 @@ enum LanguageCatalog {
     static let speechInput: [LanguageOption] = [
         LanguageOption(id: "en", displayName: "English"),
         LanguageOption(id: "zh-Hans", displayName: "Chinese (Simplified)"),
+        LanguageOption(id: "zh-Hant", displayName: "Chinese (Traditional)"),
         LanguageOption(id: "yue", displayName: "Cantonese"),
         LanguageOption(id: "es", displayName: "Spanish"),
         LanguageOption(id: "de", displayName: "German"),
@@ -58,6 +60,7 @@ enum LanguageCatalog {
         switch identifier {
         case "en": return "en-US"
         case "zh-Hans": return "zh-CN"
+        case "zh-Hant": return "zh-TW"
         case "yue": return "yue-CN"
         case "es": return "es-ES"
         case "de": return "de-DE"
