@@ -24,6 +24,9 @@ final class AppModel: ObservableObject {
     private let transcriptLogger = TranscriptLogger()
     private var liveTranscriptionSession: LiveTranscriptionSession?
     private var liveTranscriptionSessions: [LiveTranscriptionSession] = []
+    /// Hides the overlay after a stretch of silence during a running session. Rescheduled
+    /// on every recognized partial/sentence and cancelled when the session stops.
+    private var overlaySilenceHideTask: Task<Void, Never>?
     private var captionDisplayTask: Task<Void, Never>?
     private var captionTranslationTasks: [UUID: Task<Void, Never>] = [:]
     private var pendingCaptions: [QueuedCaption] = []
@@ -602,6 +605,8 @@ final class AppModel: ObservableObject {
                 sourceLanguageID: transcriptSourceLanguageID,
                 targetLanguageID: transcriptTargetLanguageID
             )
+            // Arm the silence countdown so the overlay hides if no speech ever arrives.
+            scheduleOverlaySilenceAutoHide()
         } catch {
             for session in startedSessions {
                 session.stop()
@@ -627,6 +632,7 @@ final class AppModel: ObservableObject {
     }
 
     func stopSession() {
+        cancelOverlaySilenceAutoHide()
         resetLiveTextPipeline()
         stopLiveTranscriptionSessions()
         sessionState = .idle
@@ -781,6 +787,38 @@ final class AppModel: ObservableObject {
         } else {
             showOverlayPreview()
         }
+    }
+
+    // MARK: - Auto-hide on silence
+
+    /// Seconds without recognized speech before the overlay auto-hides during a session.
+    private static let overlaySilenceTimeout: TimeInterval = 12
+
+    /// Called whenever recognized speech (a partial draft or committed sentence) arrives
+    /// during a running session: re-shows the overlay if it auto-hid, then re-arms the
+    /// silence countdown.
+    private func noteSpeechActivity() {
+        guard sessionState == .running else { return }
+        if isOverlayVisible == false {
+            isOverlayVisible = true
+        }
+        scheduleOverlaySilenceAutoHide()
+    }
+
+    private func scheduleOverlaySilenceAutoHide() {
+        overlaySilenceHideTask?.cancel()
+        let timeoutNanoseconds = UInt64(Self.overlaySilenceTimeout * 1_000_000_000)
+        overlaySilenceHideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            guard Task.isCancelled == false, let self else { return }
+            guard self.sessionState == .running, self.isOverlayVisible else { return }
+            self.isOverlayVisible = false
+        }
+    }
+
+    private func cancelOverlaySilenceAutoHide() {
+        overlaySilenceHideTask?.cancel()
+        overlaySilenceHideTask = nil
     }
 
     func updateOverlayStyle(_ update: (inout OverlayStyle) -> Void) {
@@ -1497,6 +1535,8 @@ final class AppModel: ObservableObject {
             return
         }
 
+        noteSpeechActivity()
+
         cancelCommittedCaptionArchive()
         cancelPendingDraftClear()
         activeDraftSourceLanguageID = sourceLanguageID
@@ -1887,6 +1927,8 @@ final class AppModel: ObservableObject {
         guard sourceText.isEmpty == false else {
             return
         }
+
+        noteSpeechActivity()
 
         if let promotionID = sentence.promotionSegmentID {
             guard isFinalizedDraftPromotionID(promotionID) == false else {
