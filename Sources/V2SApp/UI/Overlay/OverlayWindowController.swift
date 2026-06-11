@@ -241,6 +241,11 @@ final class OverlayWindowController {
             .sink { [weak self] _ in self?.scheduleWindowSync() }
             .store(in: &cancellables)
 
+        model.$overlayLiveContentHeight
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.scheduleWindowSync() }
+            .store(in: &cancellables)
+
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .sink { [weak self] _ in self?.scheduleWindowSync() }
             .store(in: &cancellables)
@@ -588,6 +593,8 @@ final class OverlayWindowController {
 
             if let topLeft = userDefinedTopLeft {
                 originY = topLeft.y - height
+            } else if style.anchorsToBottom {
+                originY = visibleFrame.minY + style.topInset
             } else {
                 originY = visibleFrame.maxY - style.topInset - height
             }
@@ -605,7 +612,9 @@ final class OverlayWindowController {
                 originY = topLeft.y - height
             } else {
                 originX = visibleFrame.midX - (width / 2)
-                originY = visibleFrame.maxY - style.topInset - height
+                originY = style.anchorsToBottom
+                    ? visibleFrame.minY + style.topInset
+                    : visibleFrame.maxY - style.topInset - height
             }
 
             overlayFrame = NSRect(x: originX, y: originY, width: width, height: height)
@@ -730,18 +739,26 @@ final class OverlayWindowController {
 
     private func defaultPanelHeight() -> Double {
         let style = model.overlayStyle
+        let state = model.overlayState
 
-        // Base: committed layer (translated + source + internal spacing)
-        let base = style.scaledTranslatedFontSize + style.scaledSourceFontSize + 48.0
+        // Live caption block (committed + draft), measured from the rendered view so
+        // the bar hugs its actual text. Fall back to a single-line estimate before the
+        // first measurement arrives.
+        let estimatedLive = style.scaledTranslatedFontSize + style.scaledSourceFontSize + 24.0
+        let liveHeight = max(Double(model.overlayLiveContentHeight), estimatedLive)
 
-        // Default height reserves room for the scrollback history and draft rows.
-        let historyExtra = style.scaledTranslatedFontSize
-            + style.scaledSourceFontSize
-            + 20.0
+        // Top breathing room (12) + outer vertical padding (4 * 2) + a little slack.
+        let chrome = 28.0
+        let hugged = liveHeight + chrome
 
-        let draftExtra = style.scaledTranslatedFontSize + style.scaledSourceFontSize + 18.0
+        // Reserve scrollback room only when history actually exists, bounded to a few rows
+        // so idle / short captions don't render a tall, mostly-empty box.
+        let historyLineHeight = style.scaledTranslatedFontSize + style.scaledSourceFontSize + 16.0
+        let historyReserve = min(Double(state?.history.count ?? 0), 3.0) * historyLineHeight
+        let withHistory = min(hugged + historyReserve, 300.0)
 
-        return min(max(base + historyExtra + draftExtra, 88.0), 280.0)
+        // Never shrink below what the live caption needs, nor below the controls minimum.
+        return max(withHistory, hugged, Self.minimumOverlayHeight)
     }
 
     private func beginControlDrag() {

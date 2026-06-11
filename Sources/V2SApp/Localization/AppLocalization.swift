@@ -60,6 +60,7 @@ enum AppTextKey: String {
     case backgroundOpacity
     case translatedFont
     case sourceFont
+    case subtitlePosition
     case overlay
     case hideOverlay
     case showPreview
@@ -342,6 +343,7 @@ enum AppLocalization {
             "backgroundOpacity": "Background Opacity",
             "translatedFont": "Translated Font",
             "sourceFont": "Source Font",
+            "subtitlePosition": "Subtitle Position",
             "overlay": "Overlay",
             "hideOverlay": "Hide Overlay",
             "showPreview": "Show Preview",
@@ -504,6 +506,7 @@ enum AppLocalization {
             "backgroundOpacity": "背景透明度",
             "translatedFont": "译文字体",
             "sourceFont": "原文字体",
+            "subtitlePosition": "字幕位置",
             "overlay": "浮层",
             "hideOverlay": "隐藏浮层",
             "showPreview": "显示预览",

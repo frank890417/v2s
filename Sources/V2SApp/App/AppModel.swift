@@ -68,6 +68,9 @@ final class AppModel: ObservableObject {
     @Published var isOverlayVisible = false
     @Published private(set) var overlayHistoryVisibleCount = 0
     @Published private(set) var overlayHistoryScrollOffset = 0
+    /// Measured height of the live caption block (committed + draft) reported by the
+    /// overlay view, so the panel can hug its actual content instead of a static estimate.
+    @Published private(set) var overlayLiveContentHeight: CGFloat = 0
 
     @Published var selectedSourceID: String? {
         didSet {
@@ -791,6 +794,12 @@ final class AppModel: ObservableObject {
         guard overlayHistoryVisibleCount != clampedCount else { return }
         overlayHistoryVisibleCount = clampedCount
         clampOverlayHistoryScrollOffset()
+    }
+
+    func updateOverlayLiveContentHeight(_ height: CGFloat) {
+        let snapped = ceil(height)
+        guard snapped > 0, abs(overlayLiveContentHeight - snapped) >= 2.0 else { return }
+        overlayLiveContentHeight = snapped
     }
 
     func scrollOverlayHistory(by delta: Int) {

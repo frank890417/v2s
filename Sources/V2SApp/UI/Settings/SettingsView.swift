@@ -298,6 +298,16 @@ struct SettingsView: View {
                 }
                 settingsCard {
                     sectionHeader(model.localized(.translatedFont), icon: "textformat.size")
+                    settingsRow(model.localized(.subtitlePosition)) {
+                        Picker("", selection: anchorsToBottomBinding) {
+                            Image(systemName: "arrow.up.to.line").tag(false)
+                            Image(systemName: "arrow.down.to.line").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 96)
+                    }
+                    Divider()
                     LabeledSlider(
                         title: model.localized(.topInset),
                         value: topInsetBinding,
@@ -319,13 +329,13 @@ struct SettingsView: View {
                     LabeledSlider(
                         title: model.localized(.translatedFont),
                         value: translatedFontBinding,
-                        range: 8 ... 34,
+                        range: 8 ... 96,
                         precision: 0
                     )
                     LabeledSlider(
                         title: model.localized(.sourceFont),
                         value: sourceFontBinding,
-                        range: 5 ... 28,
+                        range: 5 ... 72,
                         precision: 0
                     )
                 }
@@ -421,6 +431,10 @@ struct SettingsView: View {
 
     private var topInsetBinding: Binding<Double> {
         overlayBinding(\.topInset)
+    }
+
+    private var anchorsToBottomBinding: Binding<Bool> {
+        overlayBinding(\.anchorsToBottom)
     }
 
     private var widthRatioBinding: Binding<Double> {

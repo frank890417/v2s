@@ -190,12 +190,12 @@ struct StatusBarPopoverView: View {
                 )
                 compactSlider(
                     label: model.localized(.fontSize),
-                    value: translatedFontBinding, in: 8 ... 34,
+                    value: translatedFontBinding, in: 8 ... 96,
                     display: "\(Int(model.overlayStyle.translatedFontSize.rounded()))pt"
                 )
                 compactSlider(
                     label: model.localized(.sourceSize),
-                    value: sourceFontBinding, in: 5 ... 28,
+                    value: sourceFontBinding, in: 5 ... 72,
                     display: "\(Int(model.overlayStyle.sourceFontSize.rounded()))pt"
                 )
             }

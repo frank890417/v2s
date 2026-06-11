@@ -78,6 +78,7 @@ struct OverlayView: View {
                     .onPreferenceChange(LiveLayersHeightPreferenceKey.self) { height in
                         guard height > 0 else { return }
                         lastLiveLayersHeight = ceil(height)
+                        model.updateOverlayLiveContentHeight(height)
                     }
                     .onPreferenceChange(CommittedSlotHeightPreferenceKey.self) { height in
                         guard height > 0 else { return }
