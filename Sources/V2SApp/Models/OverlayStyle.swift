@@ -73,6 +73,7 @@ struct OverlayStyle: Codable, Equatable {
         case backgroundColor
         case showsTextOutline = "usesWhiteTextOutline"
         case textOutlineColor
+        case textOutlineWidth
         case translatedFontSize
         case sourceFontSize
         case clickThrough
@@ -96,6 +97,8 @@ struct OverlayStyle: Codable, Equatable {
     var backgroundColor: OverlayColor
     var showsTextOutline: Bool
     var textOutlineColor: OverlayColor
+    /// Thickness of the text outline in points (0 ≈ hairline 1px ring).
+    var textOutlineWidth: Double
     var translatedFontSize: Double
     var sourceFontSize: Double
     var clickThrough: Bool
@@ -121,6 +124,7 @@ struct OverlayStyle: Codable, Equatable {
         backgroundColor: .defaultBackground,
         showsTextOutline: false,
         textOutlineColor: .defaultTextOutline,
+        textOutlineWidth: 1.0,
         translatedFontSize: 24,
         sourceFontSize: 18,
         clickThrough: true,
@@ -141,6 +145,7 @@ struct OverlayStyle: Codable, Equatable {
         backgroundColor: OverlayColor,
         showsTextOutline: Bool,
         textOutlineColor: OverlayColor,
+        textOutlineWidth: Double = 1.0,
         translatedFontSize: Double,
         sourceFontSize: Double,
         clickThrough: Bool,
@@ -159,6 +164,7 @@ struct OverlayStyle: Codable, Equatable {
         self.backgroundColor = backgroundColor
         self.showsTextOutline = showsTextOutline
         self.textOutlineColor = textOutlineColor
+        self.textOutlineWidth = textOutlineWidth
         self.translatedFontSize = translatedFontSize
         self.sourceFontSize = sourceFontSize
         self.clickThrough = clickThrough
@@ -187,6 +193,7 @@ struct OverlayStyle: Codable, Equatable {
             ?? false
         textOutlineColor  = try c.decodeIfPresent(OverlayColor.self, forKey: .textOutlineColor)
             ?? .defaultTextOutline
+        textOutlineWidth = try c.decodeIfPresent(Double.self, forKey: .textOutlineWidth) ?? 1.0
         translatedFontSize = try c.decode(Double.self, forKey: .translatedFontSize)
         sourceFontSize     = try c.decode(Double.self, forKey: .sourceFontSize)
         clickThrough       = try c.decode(Bool.self,   forKey: .clickThrough)

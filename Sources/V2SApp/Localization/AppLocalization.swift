@@ -51,6 +51,7 @@ enum AppTextKey: String {
     case onlyThreeControlsAcceptClicks
     case textOutline
     case outlineColor
+    case outlineWidth
     case attachToSource
     case subtitleColor
     case backgroundColor
@@ -334,6 +335,7 @@ enum AppLocalization {
             "onlyThreeControlsAcceptClicks": "Only the 3 controls accept clicks",
             "textOutline": "Text Outline",
             "outlineColor": "Outline Color",
+            "outlineWidth": "Outline Width",
             "attachToSource": "Attach to Source",
             "subtitleColor": "Subtitle Color",
             "backgroundColor": "Background Color",
@@ -497,6 +499,7 @@ enum AppLocalization {
             "onlyThreeControlsAcceptClicks": "只有这 3 个控件可点击",
             "textOutline": "文字描边",
             "outlineColor": "描边颜色",
+            "outlineWidth": "描边粗细",
             "attachToSource": "附着到源应用",
             "subtitleColor": "字幕颜色",
             "backgroundColor": "背景颜色",

@@ -692,9 +692,10 @@ struct OverlayView: View {
         fontSize: Double,
         weight: Font.Weight
     ) -> some View {
-        ZStack {
-            ForEach(Self.textOutlineOffsets.indices, id: \.self) { index in
-                let offset = Self.textOutlineOffsets[index]
+        let offsets = Self.outlineOffsets(for: CGFloat(model.overlayStyle.textOutlineWidth))
+        return ZStack {
+            ForEach(offsets.indices, id: \.self) { index in
+                let offset = offsets[index]
                 Text(text)
                     .font(.system(size: fontSize, weight: weight))
                     .foregroundStyle(baseTextOutlineColor)
@@ -793,7 +794,7 @@ private extension OverlayView {
     static let draftBottomInset: CGFloat = 3.0
     static let draftHeightJitterTolerance: CGFloat = 6.0
     static let captionPairSpacing: CGFloat = 4.0
-    static let textOutlineOffsets: [CGSize] = [
+    static let baseOutlineOffsets: [CGSize] = [
         CGSize(width: -1, height: 0),
         CGSize(width: 1, height: 0),
         CGSize(width: 0, height: -1),
@@ -803,6 +804,26 @@ private extension OverlayView {
         CGSize(width: 1, height: -1),
         CGSize(width: 1, height: 1)
     ]
+
+    /// Offsets used to stamp shadow copies of the glyphs into a solid outline of the
+    /// requested thickness. Each copy is the full filled glyph shifted around concentric
+    /// rings, so their union dilates the text by `width` points (a thick border) rather
+    /// than a thin ring. Sample density scales with radius to avoid scalloped edges.
+    static func outlineOffsets(for width: CGFloat) -> [CGSize] {
+        let w = max(0, width)
+        if w <= 0 { return [] }
+        if w <= 1.5 { return baseOutlineOffsets }
+
+        var offsets: [CGSize] = []
+        for radius in [w * 0.5, w] {
+            let sampleCount = max(8, Int((2 * CGFloat.pi * radius / 2.0).rounded()))
+            for i in 0..<sampleCount {
+                let angle = (2 * CGFloat.pi) * (CGFloat(i) / CGFloat(sampleCount))
+                offsets.append(CGSize(width: cos(angle) * radius, height: sin(angle) * radius))
+            }
+        }
+        return offsets
+    }
 }
 
 private struct OverlayFlowAnimationState: Equatable {

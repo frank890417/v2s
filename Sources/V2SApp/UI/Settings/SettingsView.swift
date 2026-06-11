@@ -260,6 +260,12 @@ struct SettingsView: View {
                             ColorPicker("", selection: textOutlineColorBinding, supportsOpacity: false)
                                 .labelsHidden()
                         }
+                        LabeledSlider(
+                            title: model.localized(.outlineWidth),
+                            value: textOutlineWidthBinding,
+                            range: 0 ... 12,
+                            precision: 0
+                        )
                     }
                     Divider()
                     settingsRow(model.localized(.attachToSource)) {
@@ -480,6 +486,10 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+
+    private var textOutlineWidthBinding: Binding<Double> {
+        overlayBinding(\.textOutlineWidth)
     }
 
     private var attachToSourceBinding: Binding<Bool> {
